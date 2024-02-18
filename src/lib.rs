@@ -121,18 +121,34 @@ impl Emulator {
                 let ret_addr = self.pop();
                 self.program_counter = ret_addr;
             }
+            // 1NNN
             (1, _, _, _) => {
-                let addr = op & 0xFFF;
-                self.program_counter = addr;
+                let nnn = op & 0xFFF;
+                self.program_counter = nnn;
             }
+            // 2NNN
             (2, _, _, _) => {
-                let addr = op & 0xFFF;
+                let nnn = op & 0xFFF;
                 self.push(self.program_counter);
-                self.program_counter = addr;
+                self.program_counter = nnn;
             }
+            // 3XNN
             (3, _, _, _) => {
-                let addr = (op & 0xFF) as u8;
-                if self.v_registers[digit2 as usize] == addr {
+                let nn = (op & 0xFF) as u8;
+                if self.v_registers[digit2 as usize] == nn {
+                    self.program_counter += 2;
+                }
+            }
+            // 4XNN
+            (4, _, _, _) => {
+                let nn = (op & 0xFF) as u8;
+                if self.v_registers[digit2 as usize] != nn {
+                    self.program_counter += 2;
+                }
+            }
+            // 5XNN
+            (5, _, _, _) => {
+                if self.v_registers[digit2 as usize] == self.v_registers[digit3 as usize] {
                     self.program_counter += 2;
                 }
             }
@@ -164,14 +180,14 @@ mod tests {
     }
 
     #[test]
-    fn test_nop() {
+    fn test_0000_nop() {
         let mut emulator = Emulator::new();
         emulator.execute(0);
         assert_eq!(emulator, Emulator::new())
     }
 
     #[test]
-    fn test_clear_scr() {
+    fn test_0E00_clear_scr() {
         let mut emulator = Emulator::new();
         emulator.screen = [true; SCREEN_WIDTH * SCREEN_HEIGHT];
         emulator.execute(224);
@@ -179,7 +195,7 @@ mod tests {
     }
 
     #[test]
-    fn test_return_from_subroutine() {
+    fn test_00EE_return_from_subroutine() {
         let mut emulator = Emulator::new();
         emulator.push(1);
         emulator.program_counter = 2;
@@ -188,7 +204,7 @@ mod tests {
     }
 
     #[test]
-    fn test_jump_to_subroutine() {
+    fn test_1NNNN_jump_to_subroutine() {
         let mut emulator = Emulator::new();
         emulator.program_counter = 2;
         emulator.execute(4660); // 0x1234
@@ -196,7 +212,7 @@ mod tests {
     }
 
     #[test]
-    fn test_call_subroutine() {
+    fn test_2NNN_call_subroutine() {
         let mut emulator = Emulator::new();
         emulator.program_counter = 2;
         emulator.execute(8756); // 0x2234
@@ -205,11 +221,36 @@ mod tests {
     }
 
     #[test]
-    fn test_skip_ahead() {
+    fn test_3NNN_VX_eq_NN_skip_next_instruction() {
         let mut emulator = Emulator::new();
         emulator.program_counter = 2;
         emulator.v_registers[2] = 52;
         emulator.execute(12852); // 0x3234
+        assert_eq!(emulator.program_counter, 4);
+    }
+
+    #[test]
+    fn test_4NNN_VX_neq_NN_skip_next_instruction() {
+        let mut emulator = Emulator::new();
+        emulator.program_counter = 2;
+        emulator.v_registers[2] = 53;
+        emulator.execute(16948); // 0x4234
+        assert_eq!(emulator.program_counter, 4);
+    }
+
+    #[test]
+    fn test_5XY0_VX_eq_VY_skip_next_instruction() {
+        let mut emulator = Emulator::new();
+        emulator.program_counter = 2;
+
+        emulator.v_registers[2] = 53;
+        emulator.v_registers[3] = 53;
+        emulator.execute(21044); // 0x5234
+        assert_eq!(emulator.program_counter, 4);
+
+        emulator.v_registers[2] = 52;
+        emulator.v_registers[3] = 53;
+        emulator.execute(21044); // 0x5234
         assert_eq!(emulator.program_counter, 4);
     }
 }
