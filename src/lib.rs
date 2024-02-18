@@ -130,6 +130,12 @@ impl Emulator {
                 self.push(self.program_counter);
                 self.program_counter = addr;
             }
+            (3, _, _, _) => {
+                let addr = (op & 0xFF) as u8;
+                if self.v_registers[digit2 as usize] == addr {
+                    self.program_counter += 2;
+                }
+            }
             (_, _, _, _) => unimplemented!("Unimplemented opcode: {}", op),
         }
     }
@@ -196,5 +202,14 @@ mod tests {
         emulator.execute(8756); // 0x2234
         assert_eq!(emulator.program_counter, 564);
         assert_eq!(emulator.stack[0..1], [2u16]);
+    }
+
+    #[test]
+    fn test_skip_ahead() {
+        let mut emulator = Emulator::new();
+        emulator.program_counter = 2;
+        emulator.v_registers[2] = 52;
+        emulator.execute(12852); // 0x3234
+        assert_eq!(emulator.program_counter, 4);
     }
 }
